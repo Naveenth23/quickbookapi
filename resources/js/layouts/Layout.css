@@ -1,0 +1,210 @@
+/* ==========================================
+   🎨 GLOBAL LAYOUT SYSTEM (Light + Dark)
+   ========================================== */
+
+/* ---------- Theme Variables ---------- */
+:root {
+  --sidebar-width: 260px;
+
+  /* Light Theme */
+  --sidebar-bg: #0b1a34;
+  --sidebar-text: #ffffff;
+  --sidebar-hover: rgba(255, 255, 255, 0.1);
+
+  --content-bg: #f8f9fa;
+  --text-color: #222;
+  --card-bg: #ffffff;
+  --border-color: #e5e7eb;
+
+  --scrollbar-thumb: #c1c1c1;
+  --scrollbar-track: #f1f1f1;
+}
+
+[data-theme="dark"] {
+  --sidebar-bg: #101726;
+  --sidebar-text: #cfd3e1;
+  --sidebar-hover: rgba(255, 255, 255, 0.15);
+
+  --content-bg: #1b2233;
+  --text-color: #f3f4f6;
+  --card-bg: #262f45;
+  --border-color: #3b4254;
+
+  --scrollbar-thumb: #3b4254;
+  --scrollbar-track: #1a1e2b;
+}
+
+/* ---------- Global Resets ---------- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+  background: var(--content-bg);
+  color: var(--text-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+/* ==========================================
+   ⚙️ LAYOUT STRUCTURE
+   ========================================== */
+
+/* Wrapper for sidebar + main area */
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--content-bg);
+  transition: background 0.3s ease;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Collapsed (Mini) Sidebar */
+.sidebar.collapsed {
+  width: 80px;
+}
+
+.sidebar.collapsed .menu-item a span {
+  display: none;
+}
+
+.sidebar.collapsed .profile-info {
+  display: none;
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+}
+
+/* Show overlay when open on mobile */
+.sidebar.open + .sidebar-overlay {
+  display: block;
+}
+
+/* ---------- Main Content Area ---------- */
+.layout-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+  background: var(--content-bg);
+  transition: margin-left 0.3s ease, background 0.3s ease;
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+/* When sidebar collapsed */
+.sidebar-collapsed .layout-content {
+  margin-left: 80px;
+}
+
+/* When sidebar hidden (mobile) */
+.sidebar-hidden .layout-content {
+  margin-left: 0;
+}
+
+/* ---------- Topbar / Header ---------- */
+.layout-header {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 900;
+}
+
+.layout-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 18px 20px;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+/* ---------- Utility Helpers ---------- */
+.text-muted {
+  opacity: 0.7;
+}
+.text-center {
+  text-align: center;
+}
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================
+   📱 RESPONSIVENESS
+   ========================================== */
+@media (max-width: 992px) {
+  .layout-content {
+    margin-left: 0;
+    padding: 16px;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    position: fixed;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+}
+
+@media (max-width: 576px) {
+  .layout-content {
+    padding: 12px;
+  }
+}

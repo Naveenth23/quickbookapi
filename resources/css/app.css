@@ -1,0 +1,311 @@
+/* ===============================
+   GLOBAL COMPACT DASHBOARD THEME
+=============================== */
+:root {
+  /* Primary Theme Colors */
+  --bs-primary: #febb36;
+  --bs-primary-rgb: 254, 187, 54;
+
+  /* Optional: make the hover and active states slightly darker */
+  --bs-primary-hover: #e6a700;
+  --bs-primary-active: #cc9600;
+}
+
+/* Optional: Make .btn-primary match the new color */
+.btn-primary {
+  background-color: var(--bs-primary) !important;
+  border-color: var(--bs-primary) !important;
+  color: #000 !important;
+  font-weight: 500;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--bs-primary-hover) !important;
+  border-color: var(--bs-primary-hover) !important;
+  color: #000 !important;
+}
+
+.btn-outline-primary {
+  border-color: var(--bs-primary) !important;
+  color: var(--bs-primary) !important;
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--bs-primary) !important;
+  color: #000 !important;
+}
+
+/* Customize text, badges, progress, etc. */
+.text-primary {
+  color: var(--bs-primary) !important;
+}
+
+.bg-primary {
+  background-color: var(--bs-primary) !important;
+}
+
+body {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+        sans-serif;
+    font-size: 13.5px;
+    background-color: #f9fafb;
+    color: #1e293b;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 600;
+    color: #0f172a;
+    letter-spacing: -0.2px;
+    margin-bottom: 0.4rem;
+}
+
+h4,
+.page-title {
+    font-size: 1.05rem;
+}
+
+small,
+.text-muted {
+    font-size: 12px !important;
+}
+
+/* ===============================
+   CONTAINERS & LAYOUT
+=============================== */
+.page-wrapper {
+    padding: 1rem 1.25rem;
+    background-color: #f9fafb;
+    min-height: 100vh;
+}
+
+main {
+    padding: 1.25rem;
+}
+
+/* ===============================
+   BUTTONS
+=============================== */
+.btn {
+    font-size: 13px;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-primary {
+    background: #2563eb;
+    border: none;
+}
+.btn-primary:hover {
+    background: #1e40af;
+}
+.btn-outline-secondary:hover {
+    background-color: #f3f4f6;
+}
+
+/* ===============================
+   INPUTS / SELECTS
+=============================== */
+.form-control,
+.form-select {
+    font-size: 13px;
+    border-radius: 6px;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid #d1d5db;
+    transition: all 0.2s ease-in-out;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 0.1rem rgba(37, 99, 235, 0.15);
+}
+
+/* ===============================
+   CARDS
+=============================== */
+.card {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    background-color: #fff;
+    transition: all 0.15s ease-in-out;
+}
+.card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* ===============================
+   TABLES
+=============================== */
+.table {
+    font-size: 13px;
+    margin-bottom: 0;
+    border-color: #e5e7eb;
+}
+
+.table thead {
+    background-color: #f1f5f9;
+    color: #374151;
+    font-weight: 600;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* ===============================
+   BADGES
+=============================== */
+.badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+
+.badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+.badge-warning {
+    background-color: #fef9c3;
+    color: #854d0e;
+}
+.badge-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* ===============================
+   UTILITY CLASSES
+=============================== */
+.numeric,
+.price {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+.text-small {
+    font-size: 12.5px;
+}
+
+.rounded-soft {
+    border-radius: 8px;
+}
+
+/* Compact Bootstrap multiple select look like MyBillBook */
+.custom-multiselect {
+    height: auto !important;
+    min-height: 38px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.875rem;
+}
+
+.custom-multiselect option {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.custom-multiselect option:checked {
+    background-color: #eef2ff !important;
+    color: #3730a3 !important;
+    font-weight: 500;
+}
+
+/* Subtle hover effect */
+.custom-multiselect option:hover {
+    background-color: #f3f4f6 !important;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+.transition-shadow {
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.form-check-input {
+    cursor: pointer;
+    accent-color: #5a32ea;
+}
+.cursor-pointer {
+    cursor: pointer !important;
+}
+.transition-shadow {
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.bg-light {
+    background: linear-gradient(135deg, #e0f7fa, #e3f2fd);
+}
+
+.position-absolute.bg-primary,
+.position-absolute.bg-info,
+.position-absolute.bg-warning {
+    animation: float 8s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+    0% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    100% {
+        transform: translateY(-20px) rotate(10deg);
+    }
+}
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+@media print {
+    aside,
+    nav,
+    .btn,
+    .navbar {
+        display: none !important;
+    }
+    main {
+        width: 100% !important;
+    }
+}
+
+.search-dropdown {
+    z-index: 9999;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.search-row {
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+
+.search-row:hover {
+    background-color: #eef4ff;
+}
+
+.search-row-active {
+    background: linear-gradient(90deg, #0d6efd 0%, #4dabf7 100%);
+    color: #fff;
+    font-weight: 600;
+}
+
+.search-row-active td {
+    background: transparent !important;
+    color: #fff !important;
+}

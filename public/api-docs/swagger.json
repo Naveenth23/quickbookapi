@@ -1,0 +1,154 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "BillingBook API",
+    "version": "1.0.0",
+    "description": "Billing & Inventory SaaS API Documentation\n\nAuthorization:\nUse header:\nAuthorization: Bearer <token>"
+  },
+  "host": "127.0.0.1:8000",
+  "basePath": "/api",
+  "schemes": ["http"],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Enter: Bearer <token>"
+    }
+  },
+  "tags": [
+    { "name": "Auth", "description": "Authentication & User Access" },
+    { "name": "Invoices", "description": "Invoice Operations" }
+  ],
+  "paths": {
+    "/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register Business Owner",
+        "parameters": [
+          { "name": "name", "in": "formData", "required": true, "type": "string" },
+          { "name": "email", "in": "formData", "required": true, "type": "string" },
+          { "name": "phone", "in": "formData", "required": true, "type": "string" },
+          { "name": "password", "in": "formData", "required": true, "type": "string" },
+          { "name": "business", "in": "formData", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "201": { "description": "Registered Successfully" },
+          "422": { "description": "Validation Error" }
+        }
+      }
+    },
+
+    "/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login to generate JWT token",
+        "parameters": [
+          { "name": "email", "in": "formData", "required": true, "type": "string" },
+          { "name": "password", "in": "formData", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Token Granted" },
+          "401": { "description": "Invalid Credentials" }
+        }
+      }
+    },
+
+    "/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout user (revoke tokens)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Logged out successfully" }
+        }
+      }
+    },
+
+    "/invoices": {
+      "get": {
+        "tags": ["Invoices"],
+        "summary": "List invoices (paginated)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [],
+        "responses": {
+          "200": { "description": "List of invoices" }
+        }
+      },
+      "post": {
+        "tags": ["Invoices"],
+        "summary": "Create new invoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "customer_id", "in": "formData", "type": "integer", "required": true },
+          { "name": "invoice_date", "in": "formData", "required": true, "type": "string", "format": "date" },
+          { "name": "discount", "in": "formData", "required": false, "type": "number" },
+          {
+            "name": "items",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "properties": {
+                      "product_id": {"type": "integer"},
+                      "qty": {"type": "number"},
+                      "price": {"type": "number"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Invoice Created" },
+          "400": { "description": "Stock Error" }
+        }
+      }
+    },
+
+    "/invoices/{id}": {
+      "get": {
+        "tags": ["Invoices"],
+        "summary": "Get single invoice details",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "type": "integer", "required": true }
+        ],
+        "responses": {
+          "200": { "description": "Invoice Detail" },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "tags": ["Invoices"],
+        "summary": "Update invoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "type": "integer", "required": true },
+          { "name": "customer_id", "in": "formData", "type": "integer", "required": true },
+          { "name": "invoice_date", "in": "formData", "required": true, "type": "string", "format": "date" },
+          { "name": "discount", "in": "formData", "required": false, "type": "number" }
+        ],
+        "responses": {
+          "200": { "description": "Invoice Updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Invoices"],
+        "summary": "Delete invoice & restore stock",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "type": "integer", "required": true }
+        ],
+        "responses": {
+          "200": { "description": "Invoice Deleted" }
+        }
+      }
+    }
+  }
+}

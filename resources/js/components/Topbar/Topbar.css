@@ -1,0 +1,48 @@
+.topbar {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    background: var(--card-bg);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.menu-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+.topbar-title {
+    margin: 0;
+    font-size: 18px;
+}
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+}
+.btn-demo {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #e6f0ff;
+    border: none;
+    color: #0b5ed7;
+}
+
+@media (max-width: 992px) {
+    .menu-btn {
+        display: block;
+    }
+}

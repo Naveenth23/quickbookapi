@@ -1,0 +1,1121 @@
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
+import CreateItemModal from "../components/common/CreateItemModal";
+
+export default function POSBilling() {
+    const [barcodeBuffer, setBarcodeBuffer] = useState("");
+    const [items, setItems] = useState([]);
+    const [search, setSearch] = useState("");
+    const [billTotal, setBillTotal] = useState(0);
+    const [categories, setCategories] = useState([]);
+    const [receivedAmount, setReceivedAmount] = useState("");
+    const [units, setUnits] = useState([]);
+    const [selectedItemId, setSelectedItemId] = useState(null);
+    const searchInputRef = useRef(null);
+    const barcodeTimeout = useRef(null);
+    const [bills, setBills] = useState([
+        { id: 1, name: "Billing Screen 1", items: [], total: 0, received: 0 },
+    ]);
+    const [chargeName, setChargeName] = useState("");
+    const [chargeAmount, setChargeAmount] = useState("");
+    const [activeScreen, setActiveScreen] = useState(1);
+    const [tabs, setTabs] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [activeTab, setActiveTab] = useState("basic");
+
+    const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+    const [searchResults, setSearchResults] = useState([]);
+    const [showResults, setShowResults] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const [discount, setDiscount] = useState({
+        type: "after_tax", // before_tax | after_tax
+        percent: 0,
+        amount: 0,
+    });
+
+    const [extraCharges, setExtraCharges] = useState([]);
+    const [showDiscountModal, setShowDiscountModal] = useState(false);
+    const [showChargeModal, setShowChargeModal] = useState(false);
+
+    const [subTotal, setSubTotal] = useState(0);
+    const [taxTotal, setTaxTotal] = useState(0);
+    const [finalTotal, setFinalTotal] = useState(0);
+
+
+    const [form, setForm] = useState({
+        item_type: "product",
+        category_id: "",
+        name: "",
+        sale_price: "",
+        tax_included: "without_tax",
+        gst_rate: "None",
+        unit: "PCS",
+        opening_stock: "",
+        item_code: "",
+        hsn_code: "",
+        as_of_date: new Date().toISOString().split("T")[0],
+        description: "",
+        low_stock_enabled: false,
+        low_stock_qty: "",
+    });
+
+    const activeBillIndex = bills.findIndex((b) => b.id === activeScreen);
+    const activeBill = bills[activeBillIndex];
+
+    const gstOptions = [
+        "None",
+        "GST @0.25%",
+        "GST @3%",
+        "GST @5%",
+        "GST @12%",
+        "GST @18%",
+        "GST @28%",
+    ];
+
+    const axiosAuth = axios.create({
+        baseURL: "/api",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+
+    useEffect(() => {
+        const savedTabs = JSON.parse(localStorage.getItem("posTabs"));
+        if (savedTabs && savedTabs.length > 0) {
+            setTabs(savedTabs);
+            setActiveScreen(savedTabs[0].id);
+        } else {
+            setTabs([{ id: 1, name: "Billing Screen 1" }]);
+        }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem("posTabs", JSON.stringify(tabs));
+    }, [tabs]);
+
+    const addItem = () => {
+        setShowModal(true);
+    };
+
+    const handleSearch = async (query) => {
+        setSearch(query);
+        if (query.trim().length < 1) {
+            setSearchResults([]);
+            setShowResults(false);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await axios.get(`/api/products?search=${query}`, {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+            });
+            setSearchResults(res.data.data || []);
+            setShowResults(true);
+        } catch (error) {
+            console.error("Search error:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const calculateBill = (items, discountState = discount, charges = extraCharges) => {
+        const sub = items.reduce((sum, i) => sum + i.amount, 0);
+
+        // 🔹 Tax (placeholder – extend later item-wise)
+        const tax = 0;
+
+        let totalBeforeDiscount = sub + tax;
+        let discountAmount = 0;
+
+        if (discountState.percent > 0) {
+            discountAmount = (totalBeforeDiscount * discountState.percent) / 100;
+        } else if (discountState.amount > 0) {
+            discountAmount = discountState.amount;
+        }
+
+        let totalAfterDiscount =
+            discountState.type === "before_tax"
+                ? sub - discountAmount + tax
+                : totalBeforeDiscount - discountAmount;
+
+        const chargesTotal = charges.reduce((s, c) => s + Number(c.amount || 0), 0);
+
+        const final = Math.max(totalAfterDiscount + chargesTotal, 0);
+
+        setSubTotal(sub);
+        setTaxTotal(tax);
+        setFinalTotal(final);
+    };
+
+    const handleSelectItem = (product) => {
+        const currentStock = product.stock_quantity || 0;
+        if (currentStock <= 0) {
+            toast.error(`"${product.name}" has zero/negative stock quantity`);
+            return;
+        }
+
+        // ✅ Check if item already exists in cart
+        const existingIndex = items.findIndex(
+            (i) => i.product_id === product.id || i.name === product.name
+        );
+
+        let updatedItems = [...items];
+
+        if (existingIndex !== -1) {
+            const existingItem = updatedItems[existingIndex];
+            const newQty = existingItem.quantity + 1;
+
+            // ❌ If newQty would exceed stock, block it
+            if (newQty > currentStock) {
+                toast.warning(
+                    `${product.name} has zero/negative stock quantity`
+                );
+                return;
+            }
+
+            // ✅ Update quantity and total
+            existingItem.quantity = newQty;
+            existingItem.amount = newQty * existingItem.sp;
+            updatedItems[existingIndex] = existingItem;
+        } else {
+            // ✅ If adding new item and stock is available
+            if (currentStock - 1 < 0) {
+                toast.warning(`⚠️ "${product.name}" is almost out of stock.`);
+                return;
+            }
+
+            const newItem = {
+                id: items.length + 1,
+                product_id: product.id || null,
+                name: product.name,
+                code: product.sku || product.code || "-",
+                mrp: product.mrp || product.sale_price,
+                sp: product.sale_price || 0,
+                quantity: 1,
+                amount: product.sale_price || 0,
+                unit: product.unit?.name || "PCS",
+            };
+
+            updatedItems.push(newItem);
+        }
+
+        // ✅ Update UI and total
+        setItems(updatedItems);
+        calculateBill(updatedItems);
+
+        // ✅ Reset search box
+        setSearch("");
+        setSearchResults([]);
+        setShowResults(false);
+    };
+
+    // const calculateTotal = (list) => {
+    //     const total = list.reduce((sum, item) => sum + item.amount, 0);
+    //     setBillTotal(total);
+    // };
+
+    const handleHoldBill = () => {
+        const nextId = tabs.length + 1;
+        const newTabs = [
+            ...tabs,
+            { id: nextId, name: `Billing Screen ${nextId}` },
+        ];
+        setTabs(newTabs);
+        setActiveScreen(nextId);
+        setItems([]);
+        setBillTotal(0);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.ctrlKey && e.key.toLowerCase() === "i") {
+            e.preventDefault();
+            addItem();
+        }
+        if (e.key === "F7") {
+            e.preventDefault();
+            handleSaveBill();
+        }
+        if (e.ctrlKey && e.key.toLowerCase() === "b") {
+            e.preventDefault();
+            handleHoldBill();
+        }
+
+        if (e.key === "F2") {
+            e.preventDefault();
+            setShowDiscountModal(true);
+        }
+        if (e.key === "F3") {
+            e.preventDefault();
+            setShowChargeModal(true);
+        }
+
+        if (e.key === "Delete") {
+            e.preventDefault();
+            handleDeleteItem();
+        }
+    };
+
+    const clearAllItems = () => {
+        if (window.confirm("Are you sure you want to clear all items?")) {
+            setItems([]);
+            setBillTotal(0);
+        }
+    };
+
+    // ✅ Change Quantity [Q]
+    const handleChangeQuantity = () => {
+        if (items.length === 0) {
+            toast.error("❌ No items in cart to update quantity.");
+            return;
+        }
+
+        const lastItem = items[items.length - 1];
+        const input = prompt(
+            `Enter new quantity for "${lastItem.name}" (current: ${lastItem.quantity}):`
+        );
+
+        if (input === null) return; // Cancelled
+        const newQty = parseFloat(input);
+
+        if (isNaN(newQty) || newQty <= 0) {
+            toast.warning("⚠️ Please enter a valid quantity greater than 0.");
+            return;
+        }
+
+        const updated = items.map((item) =>
+            item.id === lastItem.id
+                ? {
+                      ...item,
+                      quantity: newQty,
+                      amount: newQty * item.sp,
+                  }
+                : item
+        );
+
+        setItems(updated);
+        calculateBill(updated);
+        toast.success(`✅ Quantity updated for "${lastItem.name}"`);
+    };
+
+    useEffect(() => {
+        calculateBill(items);
+    }, [discount, extraCharges]);
+
+    // Add Ctrl+C shortcut to clear all items
+    useEffect(() => {
+        const handleSpaceToLeave = (e) => {
+            if (showExitConfirm && e.code === "Space") {
+                e.preventDefault();
+                window.history.back(); // or navigate("/dashboard");
+            }
+        };
+
+        window.addEventListener("keydown", handleSpaceToLeave);
+        return () => window.removeEventListener("keydown", handleSpaceToLeave);
+    }, [showExitConfirm]);
+
+    useEffect(() => {
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    });
+
+    const loadCategories = async () => {
+        try {
+            const res = await axiosAuth.get("/categories");
+            setCategories(res.data.categories || []);
+        } catch (err) {
+            console.error("Category fetch error:", err);
+        }
+    };
+
+    const loadUnits = async () => {
+        try {
+            const res = await axiosAuth.get("/units");
+            setUnits(res.data.units || []);
+        } catch (err) {
+            console.error("Units fetch error:", err);
+        }
+    };
+
+    const handleDeleteItem = () => {
+        if (!selectedItemId) {
+            toast.warning("Select an item to delete");
+            return;
+        }
+
+        const updatedItems = items.filter(
+            (item) => item.id !== selectedItemId
+        );
+
+        setItems(updatedItems);
+        setSelectedItemId(null);
+        calculateBill(updatedItems);
+    };
+
+    const handleSaveBill = async () => {
+        if (items.length === 0) {
+            alert("Please add items before saving the bill.");
+            return;
+        }
+
+        try {
+            const payload = {
+                items: items.map((item) => ({
+                    product_id: item.product_id || null,
+                    name: item.name,
+                    code: item.code,
+                    quantity: item.quantity,
+                    sp: item.sp,
+                    amount: item.amount,
+                    unit: item.unit || "PCS",
+                })),
+                sub_total: subTotal,
+                tax: taxTotal,
+                discount,
+                extra_charges: extraCharges,
+                total: finalTotal,
+                payment_method: "cash",
+            };
+
+            const res = await axios.post("/api/orders", payload, {
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+            });
+
+            if (res.data.success) {
+                alert("✅ Bill saved successfully!");
+                setItems([]);
+                setBillTotal(0);
+            } else {
+                alert("❌ " + res.data.message);
+            }
+        } catch (error) {
+            console.error("Save Bill Error:", error);
+            alert(
+                "Error saving bill. Please check your API or internet connection."
+            );
+        }
+    };
+
+    const handleSave = async (formData) => {
+        try {
+            const res = await axiosAuth.post("/products", formData);
+            setShowModal(false);
+            loadInventory();
+        } catch (err) {
+            console.error("Item creation failed:", err);
+        }
+    };
+
+    useEffect(() => {
+        loadCategories();
+        loadUnits();
+    }, []);
+
+    useEffect(() => {
+        const handleEscExit = (e) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                setShowExitConfirm(true);
+            }
+        };
+        window.addEventListener("keydown", handleEscExit);
+        return () => window.removeEventListener("keydown", handleEscExit);
+    }, []);
+
+    // ✅ Handle Enter key on search input
+    const handleSearchKeyDown = (e) => {
+        if (e.key === "Enter" && searchResults.length > 0) {
+            e.preventDefault();
+            const firstResult = searchResults[0];
+            if (firstResult) handleSelectItem(firstResult);
+        }
+    };
+
+    // ✅ When scanner completes a barcode input and hits Enter
+    const handleBarcodeScan = async (barcode) => {
+        if (!barcode) return;
+        setLoading(true);
+
+        try {
+            const res = await axios.get(`/api/products?barcode=${barcode}`, {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+            });
+
+            const product = res.data.data?.[0];
+            if (product) {
+                handleSelectItem(product);
+            } else {
+                toast.error(`No product found for barcode: ${barcode}`);
+            }
+        } catch (err) {
+            console.error("Barcode lookup error:", err);
+            toast.error("Error scanning barcode");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const handleBarcodeInput = (e) => {
+            // Ignore when user is typing in the search input
+            if (document.activeElement === searchInputRef.current) return;
+
+            const key = e.key;
+
+            // If Enter key is pressed, treat it as "barcode complete"
+            if (key === "Enter") {
+                if (barcodeBuffer.length > 0) {
+                    handleBarcodeScan(barcodeBuffer);
+                    setBarcodeBuffer("");
+                }
+                return;
+            }
+
+            // If it's a number or letter, append to buffer
+            if (/^[a-zA-Z0-9]+$/.test(key)) {
+                setBarcodeBuffer((prev) => prev + key);
+
+                // Reset buffer if typing pauses for more than 500ms
+                clearTimeout(barcodeTimeout.current);
+                barcodeTimeout.current = setTimeout(() => {
+                    setBarcodeBuffer("");
+                }, 500);
+            }
+        };
+
+        window.addEventListener("keydown", handleBarcodeInput);
+        return () => window.removeEventListener("keydown", handleBarcodeInput);
+    }, [barcodeBuffer]);
+
+    useEffect(() => {
+        const handleFocusSearch = (e) => {
+            if (e.key === "F1") {
+                e.preventDefault(); // prevent browser help popup
+                if (searchInputRef.current) {
+                    searchInputRef.current.focus();
+                    searchInputRef.current.select(); // optional: select existing text
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleFocusSearch);
+        return () => window.removeEventListener("keydown", handleFocusSearch);
+    }, []);
+
+    return (
+        <div className="container-fluid py-3">
+            <div className="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <div className="d-flex align-items-center gap-3">
+                    <button
+                        className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+                        onClick={() => setShowExitConfirm(true)}
+                    >
+                        <i className="bi bi-arrow-left"></i> Exit POS{" "}
+                        <span className="text-muted">[ESC]</span>
+                    </button>
+                    <h5 className="fw-bold mb-0">POS Billing</h5>
+                </div>
+            </div>
+            <div className="row">
+                <div className="col-lg-8">
+                    <div className="card shadow-sm mb-3">
+                        <div className="card-body">
+                            <div className="d-flex flex-wrap align-items-center mb-3">
+                                {tabs.map((tab) => (
+                                    <div
+                                        key={tab.id}
+                                        className={`px-3 py-2 me-2 border rounded ${
+                                            tab.id === activeScreen
+                                                ? "bg-warning-subtle fw-semibold"
+                                                : "bg-light"
+                                        }`}
+                                        onClick={() => setActiveScreen(tab.id)}
+                                    >
+                                        {tab.name} [CTRL + {tab.id}]
+                                        <button
+                                            className="btn-close ms-2"
+                                            style={{ fontSize: "0.6rem" }}
+                                            onClick={() =>
+                                                setTabs(
+                                                    tabs.filter(
+                                                        (t) => t.id !== tab.id
+                                                    )
+                                                )
+                                            }
+                                        ></button>
+                                    </div>
+                                ))}
+                                <button
+                                    className="btn btn-link text-decoration-none fw-semibold ms-2"
+                                    onClick={handleHoldBill}
+                                >
+                                    + Hold Bill & Create Another [CTRL + B]
+                                </button>
+                            </div>
+
+                            <div className="d-flex gap-2 mb-3 flex-wrap">
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={addItem}
+                                >
+                                    + New Item [CTRL + I]
+                                </button>
+                                <button className="btn btn-outline-secondary">
+                                    Change Price [P]
+                                </button>
+                                <button className="btn btn-outline-secondary">
+                                    Change Qty [Q]
+                                </button>
+                                <button
+                                    className="btn btn-danger"
+                                    onClick={handleDeleteItem}
+                                >
+                                    Delete Item [DEL]
+                                </button>
+                            </div>
+
+                            <div className="position-relative mb-3">
+                                <div className="input-group">
+                                    <span className="input-group-text">
+                                        <i className="bi bi-search"></i>
+                                    </span>
+                                    <input
+                                        ref={searchInputRef} // ✅ add this
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="Search by Item Name / Item Code or Scan Barcode"
+                                        value={search}
+                                        onChange={(e) =>
+                                            handleSearch(e.target.value)
+                                        }
+                                        onKeyDown={handleSearchKeyDown}
+                                        onFocus={() => setShowResults(true)}
+                                        onBlur={() =>
+                                            setTimeout(
+                                                () => setShowResults(false),
+                                                200
+                                            )
+                                        }
+                                    />
+                                    <span className="input-group-text">
+                                        [F1]
+                                    </span>
+                                </div>
+
+                                {showResults && searchResults.length > 0 && (
+                                    <div
+                                        className="position-absolute bg-white border shadow-sm w-100"
+                                        style={{
+                                            zIndex: 10,
+                                            maxHeight: "200px",
+                                            overflowY: "auto",
+                                        }}
+                                    >
+                                        <table className="table table-hover table-sm mb-0">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>Item Name</th>
+                                                    <th>Current Stock</th>
+                                                    <th>Sales Price</th>
+                                                    <th>MRP</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {searchResults.map((p) => (
+                                                    <tr
+                                                        key={p.id}
+                                                        onClick={() =>
+                                                            handleSelectItem(p)
+                                                        }
+                                                        style={{
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        <td>{p.name}</td>
+                                                        <td>
+                                                            {p.stock_qty || 0}
+                                                        </td>
+                                                        <td>
+                                                            {p.sale_price
+                                                                ? `₹${p.sale_price}`
+                                                                : "-"}
+                                                        </td>
+                                                        <td>
+                                                            {p.mrp
+                                                                ? `₹${p.mrp}`
+                                                                : "-"}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {showResults && loading && (
+                                    <div
+                                        className="position-absolute bg-white border p-2 text-center w-100"
+                                        style={{ zIndex: 11 }}
+                                    >
+                                        Searching...
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="table-responsive">
+                                <table className="table table-bordered align-middle text-center">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Items</th>
+                                            <th>Item Code</th>
+                                            <th>MRP</th>
+                                            <th>SP (₹)</th>
+                                            <th>Quantity</th>
+                                            <th>Amount (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {items.length === 0 ? (
+                                            <tr>
+                                                <td
+                                                    colSpan={7}
+                                                    className="text-muted py-4 text-center"
+                                                >
+                                                    No items found. Use CTRL+I
+                                                    to add new items.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            items.map((item, index) => (
+                                                <tr
+                                                key={item.id}
+                                                onClick={() => setSelectedItemId(item.id)}
+                                                className={selectedItemId === item.id ? "table-warning" : ""}
+                                                style={{ cursor: "pointer" }}
+                                                >
+                                                    <td>{index + 1}</td>
+                                                    <td>{item.name}</td>
+                                                    <td>{item.code}</td>
+                                                    <td>{item.mrp}</td>
+                                                    <td>
+                                                        {selectedItemId === item.id ? (
+                                                            <input
+                                                            type="number"
+                                                            className="form-control form-control-sm text-end"
+                                                            value={item.sp}
+                                                            onChange={(e) => {
+                                                                const sp = parseFloat(e.target.value) || 0;
+                                                                const updated = items.map((i) =>
+                                                                i.id === item.id
+                                                                    ? { ...i, sp, amount: sp * i.quantity }
+                                                                    : i
+                                                                );
+                                                                setItems(updated);
+                                                                calculateBill(updated);
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                        ) : (
+                                                            `₹ ${item.sp}`
+                                                        )}
+                                                        </td>
+                                                    <td>
+                                                        {selectedItemId === item.id ? (
+                                                            <div className="d-flex align-items-center justify-content-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                className="form-control form-control-sm text-center"
+                                                                style={{ width: "70px" }}
+                                                                value={item.quantity}
+                                                                onChange={(e) => {
+                                                                const qty = parseFloat(e.target.value) || 1;
+                                                                if (qty <= 0) return;
+
+                                                                const updated = items.map((i) =>
+                                                                    i.id === item.id
+                                                                    ? { ...i, quantity: qty, amount: qty * i.sp }
+                                                                    : i
+                                                                );
+                                                                setItems(updated);
+                                                                calculateBill(updated);
+                                                                }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <span className="text-muted small">{item.unit}</span>
+                                                            </div>
+                                                        ) : (
+                                                            `${item.quantity} ${item.unit}`
+                                                        )}
+                                                        </td>
+                                                    <td className="fw-semibold">₹ {item.amount.toFixed(2)}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                                <div className="d-flex justify-content-between align-items-center border-top pt-2 mt-2">
+                                    <div>
+                                        <span className="fw-semibold">
+                                            Total Items:{" "}
+                                        </span>
+                                        <span>{items.length}</span>
+                                    </div>
+                                    <div>
+                                        <button
+                                            className="btn btn-sm btn-danger"
+                                            onClick={clearAllItems}
+                                        >
+                                            Clear All Items [CTRL + C]
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-lg-4">
+                    <div className="card shadow-sm">
+                        <div className="card-body">
+                            <div className="d-flex gap-2 mb-3">
+                                <button
+                                    className="btn btn-outline-secondary w-100"
+                                    onClick={() => setShowDiscountModal(true)}
+                                >
+                                    Add Discount <span className="text-muted">[F2]</span>
+                                </button>
+
+                                <button
+                                    className="btn btn-outline-secondary w-100"
+                                    onClick={() => setShowChargeModal(true)}
+                                >
+                                    Add Additional Charge <span className="text-muted">[F3]</span>
+                                </button>
+                            </div>
+                            <h6 className="fw-semibold mb-3">Bill details</h6>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Sub Total</span>
+                                <span>₹ {subTotal.toFixed(2)}</span>
+                            </div>
+
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Tax</span>
+                                <span>₹ {taxTotal.toFixed(2)}</span>
+                            </div>
+
+                            {/* Discount */}
+                            {(discount.amount > 0 || discount.percent > 0) && (
+                                <div className="d-flex justify-content-between mb-2 text-danger">
+                                    <span>
+                                        Discount
+                                        {discount.percent > 0 && ` (${discount.percent}%)`}
+                                    </span>
+                                    <span>
+                                        - ₹{" "}
+                                        {discount.amount > 0
+                                            ? discount.amount.toFixed(2)
+                                            : ((subTotal * discount.percent) / 100).toFixed(2)}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Additional Charges */}
+                            {extraCharges.map((c, i) => (
+                                <div key={i} className="d-flex justify-content-between mb-2">
+                                    <span>{c.name}</span>
+                                    <span>₹ {Number(c.amount).toFixed(2)}</span>
+                                </div>
+                            ))}
+
+                            <div className="mt-3 p-3 rounded bg-success-subtle d-flex justify-content-between align-items-center">
+                                <span className="fw-bold fs-6">Total Amount</span>
+                                <span className="fw-bold fs-5">₹ {finalTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="mt-4">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 className="fw-semibold mb-0">
+                                        Received Amount <span className="text-muted">[F4]</span>
+                                    </h6>
+                                </div>
+
+                                <div className="d-flex gap-2 align-items-center">
+                                    <input
+                                        type="number"
+                                        className="form-control fw-semibold"
+                                        value={receivedAmount || finalTotal}
+                                        onChange={(e) => setReceivedAmount(e.target.value)}
+                                    />
+
+                                    <select className="form-select" style={{ maxWidth: "120px" }}>
+                                        <option value="cash">Cash</option>
+                                        <option value="upi">UPI</option>
+                                        <option value="card">Card</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button
+                                className="btn btn-primary w-100 mt-3"
+                                onClick={handleSaveBill}
+                            >
+                                Save Bill [F7]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <CreateItemModal
+                show={showModal}
+                onClose={() => setShowModal(false)}
+                categories={categories}
+                units={units}
+                gstOptions={gstOptions}
+                onSave={handleSave}
+            />
+
+            {/* Exit Confirmation Modal */}
+            {showExitConfirm && (
+                <div
+                    className="modal fade show d-block"
+                    style={{ background: "rgba(0,0,0,0.4)" }}
+                >
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg">
+                            <div className="modal-header bg-light border-bottom">
+                                <h5 className="modal-title fw-semibold text-danger">
+                                    Are you sure you want to leave this page?
+                                </h5>
+                                <button
+                                    className="btn-close"
+                                    onClick={() => setShowExitConfirm(false)}
+                                ></button>
+                            </div>
+
+                            <div className="modal-body text-center py-4">
+                                <p className="text-muted mb-4">
+                                    All unsaved billing data will be lost if you
+                                    leave this page.
+                                </p>
+                                <div className="d-flex justify-content-center gap-3">
+                                    <button
+                                        className="btn btn-outline-secondary px-4"
+                                        onClick={() =>
+                                            setShowExitConfirm(false)
+                                        }
+                                    >
+                                        Stay [ESC]
+                                    </button>
+                                    <button
+                                        className="btn btn-danger px-4"
+                                        onClick={() => {
+                                            setShowExitConfirm(false);
+                                            window.history.back(); // or navigate("/dashboard");
+                                        }}
+                                    >
+                                        Leave [Space]
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showDiscountModal && (
+                <div className="modal fade show d-block" style={{ background: "rgba(0,0,0,0.45)" }}>
+                    <div className="modal-dialog modal-dialog-centered modal-md">
+                        <div className="modal-content border-0 shadow-lg rounded-3">
+
+                            {/* HEADER */}
+                            <div className="modal-header border-bottom">
+                                <h5 className="modal-title fw-semibold">Add Discount</h5>
+                                <button
+                                    className="btn-close"
+                                    onClick={() => setShowDiscountModal(false)}
+                                />
+                            </div>
+
+                            {/* BODY */}
+                            <div className="modal-body px-4 py-3">
+
+                                {/* Discount Type */}
+                                <div className="mb-4">
+                                    <label className="form-label fw-semibold mb-2">
+                                        Discount applies
+                                    </label>
+
+                                    <div className="d-flex gap-3">
+                                        <label className={`border rounded px-3 py-2 w-100 cursor-pointer ${discount.type === "before_tax" ? "border-primary bg-primary-subtle" : ""}`}>
+                                            <input
+                                                type="radio"
+                                                className="form-check-input me-2"
+                                                checked={discount.type === "before_tax"}
+                                                onChange={() =>
+                                                    setDiscount({ ...discount, type: "before_tax" })
+                                                }
+                                            />
+                                            <span className="fw-semibold">Before Tax</span>
+                                            <div className="text-muted small">
+                                                Discount reduces taxable amount
+                                            </div>
+                                        </label>
+
+                                        <label className={`border rounded px-3 py-2 w-100 cursor-pointer ${discount.type === "after_tax" ? "border-primary bg-primary-subtle" : ""}`}>
+                                            <input
+                                                type="radio"
+                                                className="form-check-input me-2"
+                                                checked={discount.type === "after_tax"}
+                                                onChange={() =>
+                                                    setDiscount({ ...discount, type: "after_tax" })
+                                                }
+                                            />
+                                            <span className="fw-semibold">After Tax</span>
+                                            <div className="text-muted small">
+                                                Discount applied on final amount
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Discount Value */}
+                                <div className="row g-3">
+                                    <div className="col-6">
+                                        <label className="form-label fw-semibold">
+                                            Percentage (%)
+                                        </label>
+                                        <div className="input-group">
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                value={discount.percent}
+                                                disabled={discount.amount > 0}
+                                                onChange={(e) =>
+                                                    setDiscount({
+                                                        ...discount,
+                                                        percent: Number(e.target.value),
+                                                        amount: 0,
+                                                    })
+                                                }
+                                            />
+                                            <span className="input-group-text">%</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="col-6">
+                                        <label className="form-label fw-semibold">
+                                            Flat Amount (₹)
+                                        </label>
+                                        <div className="input-group">
+                                            <span className="input-group-text">₹</span>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                value={discount.amount}
+                                                disabled={discount.percent > 0}
+                                                onChange={(e) =>
+                                                    setDiscount({
+                                                        ...discount,
+                                                        amount: Number(e.target.value),
+                                                        percent: 0,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Hint */}
+                                <div className="alert alert-light border mt-4 small">
+                                    Enter either a <strong>percentage</strong> or a <strong>flat amount</strong>.
+                                    Only one can be applied at a time.
+                                </div>
+                            </div>
+
+                            {/* FOOTER */}
+                            <div className="modal-footer border-top d-flex justify-content-between px-4">
+                                <button
+                                    className="btn btn-outline-secondary"
+                                    onClick={() => setShowDiscountModal(false)}
+                                >
+                                    Cancel [ESC]
+                                </button>
+
+                                <button
+                                    className="btn btn-warning fw-semibold px-4"
+                                    onClick={() => setShowDiscountModal(false)}
+                                >
+                                    Save [F7]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+            {showChargeModal && (
+                <div className="modal fade show d-block" style={{ background: "rgba(0,0,0,0.4)" }}>
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5>Add Additional Charge</h5>
+                                <button className="btn-close" onClick={() => setShowChargeModal(false)} />
+                            </div>
+
+                            <div className="modal-body">
+                                <input
+                                    className="form-control mb-2"
+                                    placeholder="Charge Name (Ex Carry Bag)"
+                                    value={chargeName}
+                                    onChange={(e) => setChargeName(e.target.value)}
+                                />
+                                <input
+                                    className="form-control"
+                                    placeholder="Amount"
+                                    type="number"
+                                    value={chargeAmount}
+                                    onChange={(e) => setChargeAmount(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="modal-footer">
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => {
+                                        const name = document.getElementById("chargeName").value;
+                                        const amount = document.getElementById("chargeAmount").value;
+                                        if (!name || !amount) return;
+
+                                        if (!chargeName || !chargeAmount) return;
+
+                                        setExtraCharges([
+                                            ...extraCharges,
+                                            { name: chargeName, amount: Number(chargeAmount) },
+                                        ]);
+
+                                        setChargeName("");
+                                        setChargeAmount("");
+                                        setShowChargeModal(false);
+                                    }}
+                                >
+                                    Save [F7]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
