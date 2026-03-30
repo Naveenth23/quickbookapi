@@ -11,20 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('business_category', function (Blueprint $table) {
+        Schema::create('otp_codes', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('business_id')
-                ->constrained()
-                ->cascadeOnDelete();
-
-            $table->foreignId('category_id')
-                ->constrained()
-                ->cascadeOnDelete();
-
+            $table->string('phone')->unique();
+            $table->string('otp', 6);
+            $table->string('name')->nullable();
+            $table->boolean('verified')->default(false);
+            $table->timestamp('expires_at');
             $table->timestamps();
-
-            $table->unique(['business_id', 'category_id']);
         });
     }
 
@@ -33,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('business_category');
+        Schema::dropIfExists('otp_codes');
     }
 };

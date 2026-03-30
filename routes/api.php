@@ -26,6 +26,17 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/auth/send-otp',        [AuthController::class, 'sendOtp']);
+Route::post('/auth/verify-otp',      [AuthController::class, 'verifyOtp']);
+Route::post('/auth/google',          [AuthController::class, 'googleAuth']);
+Route::post('/auth/login-mobile-pin',   [AuthController::class, 'loginMobilePin']);
+Route::post('/auth/login-email-pin',    [AuthController::class, 'loginEmailPin']);
+Route::post('/auth/register-mobile-pin',[AuthController::class, 'registerMobilePin']);
+Route::post('/auth/register-email-pin', [AuthController::class, 'registerEmailPin']);
+Route::post('/auth/facebook',           [AuthController::class, 'facebookAuth']);
+
+Route::post('/auth/create-business', [AuthController::class, 'createBusiness'])
+     ->middleware('auth:sanctum');
 
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UnitController;
